@@ -94,7 +94,6 @@ public:
 protected:
 	virtual void Realize(void);
 	virtual void Unrealize(void);
-    
 private:
 	void Load(MCStringRef filename, bool is_url);
 	void Synchronize(void);
@@ -105,7 +104,6 @@ private:
     
     void SeekToTimeAndWait(uint32_t p_lc_time);
     
-    void HandleCurrentTimeChanged(void);
     
     void CacheCurrentFrame(void);
     static CVReturn MyDisplayLinkCallback (CVDisplayLinkRef displayLink,
@@ -162,7 +160,8 @@ private:
     bool m_finished : 1;
     bool m_has_invalid_filename : 1;
     bool m_mirrored : 1;
-
+    
+    void HandleCurrentTimeChanged(void);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -176,7 +175,6 @@ private:
         return nil;
     
     m_av_player = player;
-    
     return self;
 }
 
@@ -437,6 +435,8 @@ void MCAVFoundationPlayer::MovieFinished(void)
     }
 }
 
+#include <pthread.h>
+
 void MCAVFoundationPlayer::HandleCurrentTimeChanged(void)
 {
     int32_t t_current_time;
@@ -544,17 +544,16 @@ CVReturn MCAVFoundationPlayer::MyDisplayLinkCallback (CVDisplayLinkRef displayLi
     bool t_has_video;
     t_has_video = ( [[[[t_self -> m_player currentItem] asset] tracksWithMediaType:AVMediaTypeVideo] count] != 0);
     
-    if (!t_has_video)
-    {
-        t_self -> HandleCurrentTimeChanged();
-        return kCVReturnSuccess;
-    }
+    CMTime t_output_item_time = kCMTimeZero;
     
-    CMTime t_output_item_time = [t_self -> m_player_item_video_output itemTimeForCVTimeStamp:*inOutputTime];
-    
-    if (![t_self -> m_player_item_video_output hasNewPixelBufferForItemTime:t_output_item_time])
+    if (t_has_video)
     {
-        return kCVReturnSuccess;
+        t_output_item_time = [t_self -> m_player_item_video_output itemTimeForCVTimeStamp:*inOutputTime];
+        
+        if (![t_self -> m_player_item_video_output hasNewPixelBufferForItemTime:t_output_item_time])
+        {
+            return kCVReturnSuccess;
+        }
     }
     
     bool t_need_update;
@@ -591,19 +590,30 @@ void MCAVFoundationPlayer::DoUpdateCurrentFrame(void *ctxt)
     if (!t_player -> m_frame_changed_pending)
         return;
     
-    CVImageBufferRef t_image;
+    bool t_has_video;
+    t_has_video = ( [[[[t_player -> m_player currentItem] asset] tracksWithMediaType:AVMediaTypeVideo] count] != 0);
+    
+    CVImageBufferRef t_image = nullptr;
+    
     [t_player -> m_lock lock];
-    t_image = [t_player -> m_player_item_video_output copyPixelBufferForItemTime:t_player -> m_next_frame_time itemTimeForDisplay:nil];
+    if (t_has_video)
+    {
+        t_image = [t_player -> m_player_item_video_output copyPixelBufferForItemTime:t_player -> m_next_frame_time itemTimeForDisplay:nil];
+    }
+    
     t_player -> m_frame_changed_pending = false;
     [t_player -> m_lock unlock];
     
-    if (t_image != nil)
+    if (t_has_video)
     {
-        if (t_player -> m_current_frame != nil)
-            CFRelease(t_player -> m_current_frame);
-        t_player -> m_current_frame = t_image;
+        if (t_image != nil)
+        {
+            if (t_player -> m_current_frame != nil)
+                CFRelease(t_player -> m_current_frame);
+            t_player -> m_current_frame = t_image;
+        }
     }
-
+    
 	MCPlatformCallbackSendPlayerFrameChanged(t_player);
     
     if (t_player -> IsPlaying())
