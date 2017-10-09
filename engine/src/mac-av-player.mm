@@ -106,6 +106,8 @@ private:
     
     
     void CacheCurrentFrame(void);
+    void HandleCurrentTimeChanged(void);
+
     static CVReturn MyDisplayLinkCallback (CVDisplayLinkRef displayLink,
                                                           const CVTimeStamp *inNow,
                                                           const CVTimeStamp *inOutputTime,
@@ -160,8 +162,6 @@ private:
     bool m_finished : 1;
     bool m_has_invalid_filename : 1;
     bool m_mirrored : 1;
-    
-    void HandleCurrentTimeChanged(void);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -434,8 +434,6 @@ void MCAVFoundationPlayer::MovieFinished(void)
         m_finished = false;
     }
 }
-
-#include <pthread.h>
 
 void MCAVFoundationPlayer::HandleCurrentTimeChanged(void)
 {
