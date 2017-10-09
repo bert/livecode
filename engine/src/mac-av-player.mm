@@ -104,10 +104,9 @@ private:
     
     void SeekToTimeAndWait(uint32_t p_lc_time);
     
-    
-    void CacheCurrentFrame(void);
     void HandleCurrentTimeChanged(void);
-
+	
+    void CacheCurrentFrame(void);
     static CVReturn MyDisplayLinkCallback (CVDisplayLinkRef displayLink,
                                                           const CVTimeStamp *inNow,
                                                           const CVTimeStamp *inOutputTime,
